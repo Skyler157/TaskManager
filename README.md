@@ -64,10 +64,8 @@ cd server
 npm run seed
 ```
 
-Seeded credentials:
-- **Admin**: `admin@taskmanager.dev` / `Admin12345!`
-- **Manager**: `manager@taskmanager.dev` / `Manager12345!`
-- **Employees**: `alex@taskmanager.dev`, `sam@taskmanager.dev` / `Employee12345!`
+- By default, the seed script **generates random passwords** and prints them once to the console.
+- Optional: set `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_EMPLOYEE_PASSWORD` in your shell before running seed.
 
 ## Roles & permissions (enforced backend + frontend)
 
