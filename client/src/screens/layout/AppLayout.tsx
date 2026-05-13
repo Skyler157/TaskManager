@@ -1,14 +1,17 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { LayoutGrid, ListTodo, LogOut, Shield, User as UserIcon, FolderKanban } from "lucide-react";
+import { motion } from "framer-motion";
 import { useAuth } from "../../auth/AuthContext";
 import { RoleGuard } from "../../routing/Guards";
+import { ThemeToggle } from "../../components/shared/ThemeToggle";
 import { Button } from "../../ui/components";
 import { cn } from "../../ui/cn";
 
 function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
   return (
     <NavLink
+
       to={to}
       className={({ isActive }) =>
         cn(
@@ -35,20 +38,23 @@ export function AppLayout() {
             <div className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 shadow-soft" />
               <div className="leading-tight">
-                <div className="text-sm font-semibold text-fg">Task Manager</div>
+                <div className="text-sm font-semibold text-fg">TaskFlow Pro</div>
                 <div className="text-xs text-fg-muted">{user?.role ?? "-"}</div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              onClick={async () => {
-                await logout();
-                navigate("/login");
-              }}
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  await logout();
+                  navigate("/login");
+                }}
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <nav className="space-y-1 px-3 pb-4">
@@ -62,9 +68,14 @@ export function AppLayout() {
           </nav>
         </aside>
 
-        <main className="px-4 py-6">
+        <motion.main
+          className="px-4 py-6"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
           <Outlet />
-        </main>
+        </motion.main>
       </div>
     </div>
   );

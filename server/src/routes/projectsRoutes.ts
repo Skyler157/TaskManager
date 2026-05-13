@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  addProjectMembers,
   createProject,
   deleteProject,
   getProject,
@@ -17,5 +18,6 @@ projectsRouter.get("/", listProjects);
 projectsRouter.post("/", requireRole("admin", "manager"), createProject);
 projectsRouter.get("/:id", getProject);
 projectsRouter.patch("/:id", updateProject);
-projectsRouter.delete("/:id", requireRole("admin"), deleteProject);
+projectsRouter.delete("/:id", requireRole("admin", "manager"), deleteProject);
+projectsRouter.post("/:id/members", requireRole("admin", "manager"), addProjectMembers);
 

@@ -137,3 +137,12 @@ export async function logout(req: Request, res: Response) {
   return res.json(ok(true, "Logged out"));
 }
 
+export async function me(req: Request, res: Response) {
+  if (!req.auth) throw new AppError("Unauthorized", 401);
+  const user = await UserModel.findById(req.auth.userId).select(
+    "name email role avatar department isActive lastSeen createdAt updatedAt",
+  );
+  if (!user) throw new AppError("User not found", 404);
+  return res.json(ok(user));
+}
+

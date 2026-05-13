@@ -6,7 +6,7 @@ import type { AuthUser } from "../types/auth";
 export type AccessTokenPayload = AuthUser;
 
 export function signAccessToken(payload: AccessTokenPayload) {
-  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: "15m" });
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: "30m" });
 }
 
 export function signRefreshToken(payload: AccessTokenPayload) {

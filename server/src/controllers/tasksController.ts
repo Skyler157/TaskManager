@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { z } from "zod";
-import { parsePagination } from "../middleware/pagination";
+import { parseListQuery } from "../middleware/pagination";
 import { ProjectModel } from "../models/Project";
 import { TaskModel } from "../models/Task";
 import { assertTaskAccess } from "../services/accessService";
+import { logAudit } from "../services/auditService";
 import { ok } from "../utils/apiResponse";
 import { AppError } from "../utils/errors";
 
@@ -13,17 +14,24 @@ const listTasksQuerySchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   project: z.string().min(1).optional(),
   assignee: z.string().min(1).optional(),
+  dueDate: z.coerce.date().optional(),
 });
 
 export async function listTasks(req: Request, res: Response) {
   if (!req.auth) throw new AppError("Unauthorized", 401);
-  const { page, limit, skip } = parsePagination(req.query);
+  const { page, limit, skip, sort } = parseListQuery(
+    req.query,
+    ["createdAt", "updatedAt", "dueDate", "priority", "status"],
+    "updatedAt",
+    -1,
+  );
   const q = listTasksQuerySchema.parse(req.query);
 
   const filter: Record<string, unknown> = {};
   if (q.status) filter.status = q.status;
   if (q.priority) filter.priority = q.priority;
   if (q.project) filter.project = new mongoose.Types.ObjectId(q.project);
+  if (q.dueDate) filter.dueDate = { $lte: q.dueDate };
 
   if (req.auth.role === "admin") {
     if (q.assignee) filter.assignedTo = new mongoose.Types.ObjectId(q.assignee);
@@ -41,7 +49,7 @@ export async function listTasks(req: Request, res: Response) {
 
   const [items, total] = await Promise.all([
     TaskModel.find(filter)
-      .sort({ updatedAt: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .populate("project", "title status")
@@ -60,6 +68,9 @@ const createTaskSchema = z.object({
   assignedToId: z.string().min(1),
   status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  estimatedHours: z.coerce.number().min(0).optional(),
+  loggedHours: z.coerce.number().min(0).optional(),
   dueDate: z.coerce.date().optional(),
 });
 
@@ -88,6 +99,9 @@ export async function createTask(req: Request, res: Response) {
     createdBy: new mongoose.Types.ObjectId(req.auth.userId),
     status: body.status ?? "todo",
     priority: body.priority ?? "medium",
+    tags: body.tags ?? [],
+    estimatedHours: body.estimatedHours ?? 0,
+    loggedHours: body.loggedHours ?? 0,
     ...(body.dueDate ? { dueDate: body.dueDate } : {}),
   });
 
@@ -96,6 +110,13 @@ export async function createTask(req: Request, res: Response) {
     .populate("assignedTo", "name email role")
     .populate("createdBy", "name email role");
 
+  await logAudit({
+    actorId: req.auth.userId,
+    action: "task.create",
+    targetType: "task",
+    targetId: task._id.toString(),
+    metadata: { projectId: body.projectId },
+  });
   return res.status(201).json(ok(populated, "Task created"));
 }
 
@@ -122,6 +143,9 @@ const updateTaskSchema = z
     assignedToId: z.string().min(1).optional(),
     status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
     priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+    tags: z.array(z.string().min(1)).optional(),
+    estimatedHours: z.coerce.number().min(0).optional(),
+    loggedHours: z.coerce.number().min(0).optional(),
     dueDate: z.coerce.date().optional(),
   })
   .strict();
@@ -149,6 +173,9 @@ export async function updateTask(req: Request, res: Response) {
       task.completedAt = body.status === "done" ? new Date() : undefined;
     }
     if (typeof body.priority === "string") task.priority = body.priority;
+    if (Array.isArray(body.tags)) task.tags = body.tags;
+    if (typeof body.estimatedHours === "number") task.estimatedHours = body.estimatedHours;
+    if (typeof body.loggedHours === "number") task.loggedHours = body.loggedHours;
     if (body.dueDate) task.dueDate = body.dueDate;
     if (body.assignedToId) task.assignedTo = new mongoose.Types.ObjectId(body.assignedToId);
   }
@@ -161,6 +188,12 @@ export async function updateTask(req: Request, res: Response) {
     .populate("createdBy", "name email role")
     .populate("comments.author", "name email role");
 
+  await logAudit({
+    actorId: req.auth.userId,
+    action: "task.update",
+    targetType: "task",
+    targetId: task._id.toString(),
+  });
   return res.json(ok(populated, "Task updated"));
 }
 
@@ -174,6 +207,12 @@ export async function deleteTask(req: Request, res: Response) {
 
   const deleted = await TaskModel.findByIdAndDelete(id);
   if (!deleted) throw new AppError("Task not found", 404);
+  await logAudit({
+    actorId: req.auth.userId,
+    action: "task.delete",
+    targetType: "task",
+    targetId: id,
+  });
   return res.json(ok(true, "Task deleted"));
 }
 
@@ -201,6 +240,34 @@ export async function addTaskComment(req: Request, res: Response) {
     .populate("createdBy", "name email role")
     .populate("comments.author", "name email role");
 
+  await logAudit({
+    actorId: req.auth.userId,
+    action: "task.comment_add",
+    targetType: "task",
+    targetId: task._id.toString(),
+  });
   return res.status(201).json(ok(populated, "Comment added"));
+}
+
+const updateStatusSchema = z.object({
+  status: z.enum(["todo", "in_progress", "review", "done"]),
+});
+
+export async function updateTaskStatus(req: Request, res: Response) {
+  if (!req.auth) throw new AppError("Unauthorized", 401);
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = updateStatusSchema.parse(req.body);
+  const task = await assertTaskAccess({ taskId: id, userId: req.auth.userId, role: req.auth.role });
+  task.status = body.status;
+  task.completedAt = body.status === "done" ? new Date() : undefined;
+  await task.save();
+  await logAudit({
+    actorId: req.auth.userId,
+    action: "task.status_update",
+    targetType: "task",
+    targetId: id,
+    metadata: { status: body.status },
+  });
+  return res.json(ok(task, "Task status updated"));
 }
 

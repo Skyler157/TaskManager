@@ -5,18 +5,18 @@ export default {
     extend: {
       colors: {
         bg: {
-          DEFAULT: "#0b1020",
-          subtle: "#0f172a",
-          elevated: "#111b33",
+          DEFAULT: "rgb(var(--bg) / <alpha-value>)",
+          subtle: "rgb(var(--bg-subtle) / <alpha-value>)",
+          elevated: "rgb(var(--bg-elevated) / <alpha-value>)",
         },
         fg: {
-          DEFAULT: "#e5e7eb",
-          muted: "#a3aab8",
+          DEFAULT: "rgb(var(--fg) / <alpha-value>)",
+          muted: "rgb(var(--fg-muted) / <alpha-value>)",
         },
-        border: "#22304f",
+        border: "rgb(var(--border) / <alpha-value>)",
         accent: {
-          DEFAULT: "#6366f1",
-          2: "#a78bfa",
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          2: "rgb(var(--accent-2) / <alpha-value>)",
         },
         priority: {
           low: "#22c55e",

@@ -3,6 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
 import { AuthProvider } from "./auth/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { AppRoutes } from "./routing/Routes";
 
 const queryClient = new QueryClient({
@@ -18,17 +19,19 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: { background: "#111b33", color: "#e5e7eb", border: "1px solid #22304f" },
-            }}
-          />
-        </BrowserRouter>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: { background: "#1E1E28", color: "#F4F4F6", border: "1px solid rgba(255,255,255,0.07)" },
+              }}
+            />
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

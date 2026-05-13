@@ -6,6 +6,11 @@ export type UserDoc = {
   email: string;
   passwordHash: string;
   role: Role;
+  avatar?: string;
+  department?: string;
+  lastSeen?: Date;
+  isActive: boolean;
+  refreshToken?: string;
   refreshTokenHash?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +34,11 @@ const userSchema = new Schema<UserDoc>(
       enum: ["admin", "manager", "employee"],
       default: "employee",
     },
+    avatar: { type: String, required: false, default: "" },
+    department: { type: String, required: false, default: "General", index: true },
+    lastSeen: { type: Date, required: false },
+    isActive: { type: Boolean, required: true, default: true, index: true },
+    refreshToken: { type: String, required: false, select: false },
     refreshTokenHash: { type: String, required: false, select: false },
   },
   { timestamps: true },

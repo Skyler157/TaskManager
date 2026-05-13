@@ -6,6 +6,7 @@ import {
   getTask,
   listTasks,
   updateTask,
+  updateTaskStatus,
 } from "../controllers/tasksController";
 import { verifyToken } from "../middleware/verifyToken";
 
@@ -19,4 +20,5 @@ tasksRouter.get("/:id", getTask);
 tasksRouter.patch("/:id", updateTask);
 tasksRouter.delete("/:id", deleteTask);
 tasksRouter.post("/:id/comments", addTaskComment);
+tasksRouter.patch("/:id/status", updateTaskStatus);
 
