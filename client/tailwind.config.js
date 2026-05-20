@@ -31,6 +31,13 @@ export default {
       },
       boxShadow: {
         soft: "0 10px 30px rgba(0,0,0,0.35)",
+        glow: "0 0 20px rgba(99, 102, 241, 0.3)",
+      },
+      animation: {
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+      },
+      screens: {
+        xs: "475px",
       },
     },
   },

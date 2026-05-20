@@ -21,7 +21,7 @@ export function AdminUsersPage() {
   const users = useQuery({
     queryKey: ["admin", "users"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Paginated<User>>>("/api/users?page=1&limit=200");
+      const res = await api.get<ApiResponse<Paginated<User>>>("/api/users?page=1&limit=100");
       if (!res.data.success) throw new Error(res.data.message);
       return res.data.data.items;
     },

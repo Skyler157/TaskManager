@@ -10,7 +10,6 @@
     --warning: 245 158 11;
     --danger: 244 63 94;
     --info: 14 165 233;
-    transition: all 0.3s ease;
   }
 
   :root.dark {
@@ -36,6 +35,7 @@
   html,
   body {
     height: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -47,5 +47,33 @@
   h3,
   h4 {
     @apply font-display text-fg;
+  }
+
+  a {
+    @apply text-accent transition-colors hover:text-accent/80;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-bg-subtle;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-full hover:bg-white/30;
+  }
+}
+
+@layer utilities {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }

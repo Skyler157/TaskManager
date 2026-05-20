@@ -1,11 +1,23 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 import type { ApiResponse, Paginated, Project } from "../../types";
 import { useAuth } from "../../auth/AuthContext";
-import { Button, Card, Input, Label, Modal, Textarea } from "../../ui/components";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Modal,
+  Skeleton,
+  Textarea,
+} from "../../ui/components";
+import { Plus, Users } from "lucide-react";
 
 export function ProjectsPage() {
   const { role } = useAuth();
@@ -45,48 +57,80 @@ export function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Projects</h1>
-          <p className="mt-1 text-sm text-fg-muted">Your accessible projects (role-filtered).</p>
+          <p className="mt-1 text-sm text-fg-muted">Organize your work into collaborative projects.</p>
         </div>
         {canCreate && (
-          <Button onClick={() => setOpen(true)} className="shrink-0">
-            New project
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New Project
           </Button>
         )}
       </div>
 
-      {projects.isLoading && <div className="text-sm text-fg-muted">Loading…</div>}
+      {projects.isLoading && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+      )}
       {projects.isError && <div className="text-sm text-red-400">{(projects.error as Error).message}</div>}
-      {!projects.isLoading && content.length === 0 && <div className="text-sm text-fg-muted">No projects yet.</div>}
+      {!projects.isLoading && content.length === 0 && (
+        <div className="py-8 text-center">
+          <p className="text-sm text-fg-muted">No projects yet.</p>
+          {canCreate && (
+            <Button variant="ghost" className="mt-2" onClick={() => setOpen(true)}>
+              Create your first project
+            </Button>
+          )}
+        </div>
+      )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {content.map((p) => (
-          <Card key={p._id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-lg font-semibold text-fg">{p.title}</div>
-                <div className="mt-1 line-clamp-2 text-sm text-fg-muted">{p.description || "—"}</div>
-              </div>
-              <span className="rounded-full border border-border bg-white/5 px-2 py-0.5 text-xs text-fg-muted">
-                {p.status}
-              </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-fg-muted">{p.members?.length ?? 0} members</span>
-              <Link className="text-sm text-accent hover:underline" to={`/projects/${p._id}`}>
-                Open
-              </Link>
-            </div>
-          </Card>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {content.map((p) => {
+          const statusColors = {
+            active: "text-priority-low",
+            planning: "text-accent",
+            on_hold: "text-priority-medium",
+            completed: "text-priority-low",
+            archived: "text-fg-muted",
+          };
+          return (
+            <Card key={p._id} className="transition-all duration-200 hover:shadow-md">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <CardTitle className="line-clamp-1">{p.title}</CardTitle>
+                  <span className={`text-xs font-medium ${statusColors[p.status as keyof typeof statusColors]}`}>
+                    {p.status}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-fg-muted line-clamp-2 min-h-[2.5rem]">
+                  {p.description || "No description provided."}
+                </p>
+                <div className="mt-4 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1 text-fg-muted">
+                    <Users className="h-3 w-3" />
+                    {p.members?.length ?? 0} members
+                  </div>
+                  <Link className="font-medium text-accent hover:underline" to={`/projects/${p._id}`}>
+                    Open
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <Modal
         open={open}
-        title="Create project"
-        description="Managers/Admins can create projects."
+        title="Create Project"
+        description="Start a new project to organize your team's work."
         onClose={() => setOpen(false)}
         footer={
           <>
@@ -102,11 +146,16 @@ export function ProjectsPage() {
         <div className="space-y-3">
           <div className="space-y-2">
             <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" />
           </div>
           <div className="space-y-2">
             <Label>Description</Label>
-            <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Textarea
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this project about?"
+            />
           </div>
         </div>
       </Modal>

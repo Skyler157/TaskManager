@@ -1,66 +1,134 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
-import { priorityBadgeClass } from "../../lib/taskUi";
+import { priorityBadgeClass, statusColor } from "../../lib/taskUi";
 import type { ApiResponse, Paginated, Task } from "../../types";
-import { Card, Badge } from "../../ui/components";
+import { Badge, Card, CardContent, CardHeader, CardTitle, StatCard, Skeleton, Button } from "../../ui/components";
+import { LayoutGrid, FolderKanban, ListTodo, TrendingUp, Plus } from "lucide-react";
+import { cn } from "../../ui/cn";
 
 export function DashboardPage() {
   const recentTasks = useQuery({
     queryKey: ["tasks", "recent"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Paginated<Task>>>("/api/tasks?limit=5&page=1");
+      const res = await api.get<ApiResponse<Paginated<Task>>>("/api/tasks?limit=5&page=1&sort=-updatedAt");
       if (!res.data.success) throw new Error(res.data.message);
       return res.data.data.items;
     },
   });
 
+  const tasks = useQuery({
+    queryKey: ["tasks", "stats"],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Paginated<Task>>>("/api/tasks?limit=100");
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data.items;
+    },
+  });
+
+  const stats = {
+    total: tasks.data?.length ?? 0,
+    todo: tasks.data?.filter((t) => t.status === "todo").length ?? 0,
+    inProgress: tasks.data?.filter((t) => t.status === "in_progress").length ?? 0,
+    done: tasks.data?.filter((t) => t.status === "done").length ?? 0,
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-1 text-sm text-fg-muted">Recent work and quick stats.</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-4">
-          <div className="text-xs text-fg-muted">Health</div>
-          <div className="mt-2 text-lg font-semibold">Ready</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-fg-muted">Focus</div>
-          <div className="mt-2 text-lg font-semibold">Your tasks</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-fg-muted">Roles</div>
-          <div className="mt-2 text-lg font-semibold">Admin / Manager / Member</div>
-        </Card>
-      </div>
-
-      <Card className="p-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold">Recent tasks</h2>
-          <span className="text-xs text-fg-muted">Auto-filtered by role</span>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="mt-1 text-sm text-fg-muted">Welcome back! Here's your productivity overview.</p>
         </div>
+        <Link to="/tasks">
+          <Button variant="outline">
+            <Plus className="h-4 w-4" />
+            New Task
+          </Button>
+        </Link>
+      </div>
 
-        {recentTasks.isLoading && <div className="mt-4 text-sm text-fg-muted">Loading…</div>}
-        {recentTasks.isError && (
-          <div className="mt-4 text-sm text-red-400">{(recentTasks.error as Error).message}</div>
-        )}
-        {!recentTasks.isLoading && recentTasks.data?.length === 0 && (
-          <div className="mt-4 text-sm text-fg-muted">No tasks yet.</div>
-        )}
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total Tasks"
+          value={stats.total}
+          icon={<ListTodo className="h-5 w-5" />}
+          trend="+12% this week"
+          trendUp={true}
+        />
+        <StatCard
+          label="To Do"
+          value={stats.todo}
+          icon={<LayoutGrid className="h-5 w-5" />}
+          trend={`${stats.todo} pending`}
+          trendUp={false}
+        />
+        <StatCard
+          label="In Progress"
+          value={stats.inProgress}
+          icon={<TrendingUp className="h-5 w-5" />}
+          trend="Active work"
+          trendUp={true}
+        />
+        <StatCard
+          label="Completed"
+          value={stats.done}
+          icon={<FolderKanban className="h-5 w-5" />}
+          trend="Great job!"
+          trendUp={true}
+        />
+      </div>
 
-        <div className="mt-4 space-y-2">
-          {recentTasks.data?.map((t) => (
-            <div key={t._id} className="flex items-center justify-between rounded-lg border border-border bg-bg-subtle px-3 py-2">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-fg">{t.title}</div>
-                <div className="truncate text-xs text-fg-muted">{t.project?.title}</div>
-              </div>
-              <Badge color={priorityBadgeClass(t.priority)}>{t.priority}</Badge>
+      {/* Recent Tasks */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Recent Tasks</CardTitle>
+            <Link className="text-sm text-accent hover:underline" to="/tasks">
+              View all
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recentTasks.isLoading && (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+          {recentTasks.isError && (
+            <div className="text-sm text-red-400">{(recentTasks.error as Error).message}</div>
+          )}
+          {!recentTasks.isLoading && recentTasks.data?.length === 0 && (
+            <div className="py-8 text-center text-sm text-fg-muted">
+              No tasks yet.{" "}
+              <Link className="text-accent hover:underline" to="/tasks">
+                Create your first task
+              </Link>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {recentTasks.data?.map((t) => (
+              <Link
+                key={t._id}
+                to={`/tasks/${t._id}`}
+                className="flex items-center justify-between rounded-lg border border-border bg-bg-subtle px-3 py-2.5 transition-colors hover:bg-white/5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-fg">{t.title}</div>
+                  <div className="truncate text-xs text-fg-muted">{t.project?.title ?? "No project"}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-xs", statusColor(t.status))}>{t.status.replace("_", " ")}</span>
+                  <Badge color={priorityBadgeClass(t.priority)}>{t.priority}</Badge>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

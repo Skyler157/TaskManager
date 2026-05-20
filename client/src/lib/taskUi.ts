@@ -1,4 +1,4 @@
-import type { TaskPriority } from "../types";
+import type { TaskPriority, TaskStatus } from "../types";
 
 export function priorityBadgeClass(priority: TaskPriority | string) {
   const map: Record<string, string> = {
@@ -8,5 +8,15 @@ export function priorityBadgeClass(priority: TaskPriority | string) {
     urgent: "bg-priority-urgent/15 text-priority-urgent border border-priority-urgent/30",
   };
   return map[priority] ?? "bg-white/10 text-fg border border-border";
+}
+
+export function statusColor(status: TaskStatus | string) {
+  const map: Record<string, string> = {
+    todo: "text-fg-muted",
+    in_progress: "text-accent",
+    review: "text-priority-medium",
+    done: "text-priority-low",
+  };
+  return map[status] ?? "text-fg-muted";
 }
 
