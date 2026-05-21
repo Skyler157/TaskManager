@@ -12,8 +12,16 @@ import { AppError } from "../utils/errors";
 const listTasksQuerySchema = z.object({
   status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-  project: z.string().min(1).optional(),
-  assignee: z.string().min(1).optional(),
+  project: z
+    .string()
+    .min(1)
+    .refine((v) => mongoose.isValidObjectId(v), "Invalid project id")
+    .optional(),
+  assignee: z
+    .string()
+    .min(1)
+    .refine((v) => mongoose.isValidObjectId(v), "Invalid assignee id")
+    .optional(),
   dueDate: z.coerce.date().optional(),
 });
 
@@ -64,8 +72,8 @@ export async function listTasks(req: Request, res: Response) {
 const createTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  projectId: z.string().min(1),
-  assignedToId: z.string().min(1),
+  projectId: z.string().min(1).refine((v) => mongoose.isValidObjectId(v), "Invalid project id"),
+  assignedToId: z.string().min(1).refine((v) => mongoose.isValidObjectId(v), "Invalid assignee id"),
   status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   tags: z.array(z.string().min(1)).optional(),
@@ -140,7 +148,11 @@ const updateTaskSchema = z
   .object({
     title: z.string().min(1).optional(),
     description: z.string().optional(),
-    assignedToId: z.string().min(1).optional(),
+    assignedToId: z
+      .string()
+      .min(1)
+      .refine((v) => mongoose.isValidObjectId(v), "Invalid assignee id")
+      .optional(),
     status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
     priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
     tags: z.array(z.string().min(1)).optional(),
@@ -270,4 +282,3 @@ export async function updateTaskStatus(req: Request, res: Response) {
   });
   return res.json(ok(task, "Task status updated"));
 }
-

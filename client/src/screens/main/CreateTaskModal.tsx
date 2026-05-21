@@ -1,17 +1,11 @@
-import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-import { useMutation } from "@tanstack/react-query";
-import type { ApiResponse, Project, Task, TaskPriority } from "../../types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type { ApiResponse, Paginated, Project, Task, TaskPriority, User } from "../../types";
 import { api } from "../../lib/api";
 import { Button, Input, Label, Modal, Select, Textarea } from "../../ui/components";
-
-function userId(u: Project["members"][number]) {
-  const anyUser = u as { id?: string; _id?: string };
-  return anyUser.id ?? anyUser._id ?? "";
-}
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -19,6 +13,7 @@ const schema = z.object({
   assignedToId: z.string().min(1, "Pick an assignee"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
   dueDate: z.string().optional(),
+  tags: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -34,21 +29,34 @@ export function CreateTaskModal({
   onClose: () => void;
   onCreated: (task: Task) => void;
 }) {
-  const members = useMemo(() => project.members ?? [], [project.members]);
+  const employees = useQuery({
+    queryKey: ["users", "employees"],
+    enabled: open,
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Paginated<User>>>("/api/users?role=employee&page=1&limit=100");
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data.items;
+    },
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: "",
       description: "",
-      assignedToId: members.length ? userId(members[0]) : "",
+      assignedToId: "",
       priority: "medium",
       dueDate: "",
+      tags: "",
     },
   });
 
   const createTask = useMutation({
     mutationFn: async (values: FormValues) => {
+      const tags = (values.tags ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
       const payload = {
         title: values.title,
         description: values.description ?? "",
@@ -56,6 +64,7 @@ export function CreateTaskModal({
         assignedToId: values.assignedToId,
         priority: values.priority as TaskPriority,
         ...(values.dueDate ? { dueDate: values.dueDate } : {}),
+        ...(tags.length ? { tags } : {}),
       };
       const res = await api.post<ApiResponse<Task>>("/api/tasks", payload);
       if (!res.data.success) throw new Error(res.data.message);
@@ -113,9 +122,10 @@ export function CreateTaskModal({
           <div className="space-y-2">
             <Label htmlFor="assignedToId">Assignee</Label>
             <Select id="assignedToId" {...form.register("assignedToId")}>
-              {members.map((m) => (
-                <option key={userId(m)} value={userId(m)}>
-                  {m.name} ({m.email})
+              <option value="">{employees.isLoading ? "Loading…" : "Select assignee"}</option>
+              {(employees.data ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.email})
                 </option>
               ))}
             </Select>
@@ -138,6 +148,12 @@ export function CreateTaskModal({
         <div className="space-y-2">
           <Label htmlFor="dueDate">Due date</Label>
           <Input id="dueDate" type="date" {...form.register("dueDate")} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="tags">Tags</Label>
+          <Input id="tags" placeholder="frontend, api" {...form.register("tags")} />
+          <div className="text-xs text-fg-muted">Comma-separated.</div>
         </div>
       </form>
     </Modal>

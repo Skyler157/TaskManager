@@ -44,7 +44,13 @@ const userSchema = new Schema<UserDoc>(
   { timestamps: true },
 );
 
+userSchema.virtual("id").get(function id(this: { _id: mongoose.Types.ObjectId }) {
+  return this._id.toString();
+});
+
+userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toObject", { virtuals: true });
+
 export const UserModel =
   (mongoose.models.User as mongoose.Model<UserDoc>) ||
   mongoose.model<UserDoc>("User", userSchema);
-

@@ -6,6 +6,7 @@ import type { ApiResponse, Paginated, Task } from "../../types";
 import { Badge, Card, CardContent, CardHeader, CardTitle, StatCard, Skeleton, Button } from "../../ui/components";
 import { LayoutGrid, FolderKanban, ListTodo, TrendingUp, Plus } from "lucide-react";
 import { cn } from "../../ui/cn";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export function DashboardPage() {
   const recentTasks = useQuery({
@@ -32,6 +33,20 @@ export function DashboardPage() {
     inProgress: tasks.data?.filter((t) => t.status === "in_progress").length ?? 0,
     done: tasks.data?.filter((t) => t.status === "done").length ?? 0,
   };
+
+  const statusData = [
+    { name: "To Do", value: stats.todo, color: "#a3aab8" },
+    { name: "In Progress", value: stats.inProgress, color: "#6366f1" },
+    { name: "Review", value: tasks.data?.filter((t) => t.status === "review").length ?? 0, color: "#eab308" },
+    { name: "Done", value: stats.done, color: "#22c55e" },
+  ].filter((d) => d.value > 0);
+
+  const priorityData = [
+    { name: "Low", value: tasks.data?.filter((t) => t.priority === "low").length ?? 0, color: "#22c55e" },
+    { name: "Medium", value: tasks.data?.filter((t) => t.priority === "medium").length ?? 0, color: "#eab308" },
+    { name: "High", value: tasks.data?.filter((t) => t.priority === "high").length ?? 0, color: "#f97316" },
+    { name: "Urgent", value: tasks.data?.filter((t) => t.priority === "urgent").length ?? 0, color: "#ef4444" },
+  ].filter((d) => d.value > 0);
 
   return (
     <div className="space-y-6">
@@ -78,6 +93,64 @@ export function DashboardPage() {
           trend="Great job!"
           trendUp={true}
         />
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasks by status</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[260px]">
+            {tasks.isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : statusData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-fg-muted">No data yet.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                    {statusData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: "#111b33", border: "1px solid #22304f", color: "#e5e7eb" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasks by priority</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[260px]">
+            {tasks.isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : priorityData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-fg-muted">No data yet.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={priorityData}>
+                  <CartesianGrid stroke="#22304f" strokeDasharray="3 3" />
+                  <XAxis dataKey="name" stroke="#a3aab8" />
+                  <YAxis allowDecimals={false} stroke="#a3aab8" />
+                  <Tooltip
+                    contentStyle={{ background: "#111b33", border: "1px solid #22304f", color: "#e5e7eb" }}
+                  />
+                  <Bar dataKey="value">
+                    {priorityData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Tasks */}

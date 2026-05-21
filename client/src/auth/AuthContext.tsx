@@ -14,6 +14,7 @@ type AuthContextValue = AuthState & {
   login: (args: { email: string; password: string }) => Promise<void>;
   register: (args: { name: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  updateLocalUser: (patch: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -64,7 +65,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    return { accessToken, user, isAuthenticated, role, login, register, logout };
+    function updateLocalUser(patch: Partial<User>) {
+      setUserState((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, ...patch } satisfies User;
+        setStoredUser(next);
+        return next;
+      });
+    }
+
+    return { accessToken, user, isAuthenticated, role, login, register, logout, updateLocalUser };
   }, [accessToken, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -75,4 +85,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
-

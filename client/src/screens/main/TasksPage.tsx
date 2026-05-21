@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 import { priorityBadgeClass, statusColor } from "../../lib/taskUi";
-import type { ApiResponse, Paginated, Task, TaskPriority, TaskStatus } from "../../types";
+import type { ApiResponse, Paginated, Task, TaskPriority, TaskStatus, User } from "../../types";
 import {
   Badge,
   Button,
@@ -20,8 +20,12 @@ import {
 } from "../../ui/components";
 import { Plus } from "lucide-react";
 import { cn } from "../../ui/cn";
+import { useAuth } from "../../auth/AuthContext";
 
 export function TasksPage() {
+  const { role } = useAuth();
+  const canCreate = role === "admin" || role === "manager";
+
   const [status, setStatus] = useState<TaskStatus | "">("");
   const [priority, setPriority] = useState<TaskPriority | "">("");
   const [q, setQ] = useState("");
@@ -32,6 +36,9 @@ export function TasksPage() {
   const [createDescription, setCreateDescription] = useState("");
   const [createProjectId, setCreateProjectId] = useState("");
   const [createAssignedTo, setCreateAssignedTo] = useState("");
+  const [createPriority, setCreatePriority] = useState<TaskPriority>("medium");
+  const [createDueDate, setCreateDueDate] = useState("");
+  const [createTags, setCreateTags] = useState("");
 
   const tasks = useQuery({
     queryKey: ["tasks", { status, priority }],
@@ -56,6 +63,16 @@ export function TasksPage() {
     },
   });
 
+  const employees = useQuery({
+    queryKey: ["users", "employees"],
+    enabled: open && canCreate,
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Paginated<User>>>("/api/users?role=employee&page=1&limit=100");
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data;
+    },
+  });
+
   const filtered = useMemo(() => {
     const items = tasks.data ?? [];
     if (!q.trim()) return items;
@@ -65,11 +82,18 @@ export function TasksPage() {
 
   const createTask = useMutation({
     mutationFn: async () => {
+      const tags = createTags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
       const res = await api.post<ApiResponse<Task>>("/api/tasks", {
         title: createTitle,
         description: createDescription,
         projectId: createProjectId,
         assignedToId: createAssignedTo,
+        priority: createPriority,
+        ...(createDueDate ? { dueDate: createDueDate } : {}),
+        ...(tags.length ? { tags } : {}),
       });
       if (!res.data.success) throw new Error(res.data.message);
       return res.data.data;
@@ -81,6 +105,9 @@ export function TasksPage() {
       setCreateDescription("");
       setCreateProjectId("");
       setCreateAssignedTo("");
+      setCreatePriority("medium");
+      setCreateDueDate("");
+      setCreateTags("");
       await qc.invalidateQueries({ queryKey: ["tasks"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create task"),
@@ -93,10 +120,12 @@ export function TasksPage() {
           <h1 className="text-2xl font-semibold">Tasks</h1>
           <p className="mt-1 text-sm text-fg-muted">Manage your work and collaborate with your team.</p>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" />
-          New Task
-        </Button>
+        {canCreate ? (
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New Task
+          </Button>
+        ) : null}
       </div>
 
       <Card>
@@ -184,7 +213,10 @@ export function TasksPage() {
             <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => createTask.mutate()} disabled={!createTitle || createTask.isPending}>
+            <Button
+              onClick={() => createTask.mutate()}
+              disabled={!createTitle || !createProjectId || !createAssignedTo || createTask.isPending}
+            >
               {createTask.isPending ? "Creating…" : "Create Task"}
             </Button>
           </>
@@ -228,10 +260,53 @@ export function TasksPage() {
             </div>
             <div>
               <label className="text-xs text-fg-muted">Assignee</label>
-              <Input
+              <Select
                 value={createAssignedTo}
                 onChange={(e) => setCreateAssignedTo(e.target.value)}
-                placeholder="User ID"
+                className="mt-1"
+                disabled={employees.isLoading || employees.isError}
+              >
+                <option value="">
+                  {employees.isLoading ? "Loading…" : "Select assignee"}
+                </option>
+                {employees.data?.items?.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="text-xs text-fg-muted">Priority</label>
+              <Select
+                value={createPriority}
+                onChange={(e) => setCreatePriority(e.target.value as TaskPriority)}
+                className="mt-1"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-fg-muted">Due date</label>
+              <Input
+                type="date"
+                value={createDueDate}
+                onChange={(e) => setCreateDueDate(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-fg-muted">Tags</label>
+              <Input
+                value={createTags}
+                onChange={(e) => setCreateTags(e.target.value)}
+                placeholder="frontend, api"
                 className="mt-1"
               />
             </div>

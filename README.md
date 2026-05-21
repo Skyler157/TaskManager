@@ -57,6 +57,13 @@ Server health check: `GET /api/health`
 
 UI tip: open a project (`/projects/:id`) to use the Kanban board and create tasks via **New task**.
 
+## Deploy (Netlify)
+
+This repo is a monorepo; deploy the `client/` Vite app.
+
+- Netlify build settings are in `netlify.toml`
+- You must set `VITE_API_BASE_URL` on Netlify to your deployed backend URL (Netlify only hosts the frontend)
+
 ## Seed database
 
 ```bash

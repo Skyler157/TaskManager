@@ -71,9 +71,14 @@ export function AppLayout() {
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-accent to-accent-2" />
+                  <img
+                    src="/favicon.svg"
+                    alt="TaskFlow Pro Logo"
+                    className="h-8 w-8 rounded-lg object-contain"
+                  />
                   <span className="font-semibold text-fg">TaskFlow Pro</span>
                 </div>
+
                 <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(false)}>
                   <X className="h-5 w-5" />
                 </Button>
@@ -97,7 +102,12 @@ export function AppLayout() {
         {/* Desktop Sidebar */}
         <aside className="hidden border-r border-border bg-bg-subtle md:block md:min-h-screen">        <div className="flex h-full flex-col">
           <div className="flex items-center gap-2 px-4 py-5">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-accent to-accent-2 shadow-soft" />
+            <img
+              src="/favicon.svg"
+              alt="TaskFlow Pro Logo"
+              className="h-9 w-9 rounded-xl object-contain shadow-soft"
+            />
+
             <div className="leading-tight">
               <div className="text-sm font-semibold text-fg">TaskFlow Pro</div>
               <div className="text-xs text-fg-muted">{user?.role ?? "-"}</div>

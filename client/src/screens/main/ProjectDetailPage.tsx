@@ -10,6 +10,7 @@ import { Card, Badge, Button, CardHeader, CardTitle, CardContent, Skeleton } fro
 import { useAuth } from "../../auth/AuthContext";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { ArrowLeft, Plus, RefreshCw, Users } from "lucide-react";
+import { ManageMembersModal } from "./ManageMembersModal";
 
 const columns: Array<{ key: TaskStatus; title: string; emoji: string }> = [
   { key: "todo", title: "To Do", emoji: "📋" },
@@ -24,6 +25,7 @@ export function ProjectDetailPage() {
   const qc = useQueryClient();
   const { role } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const canCreate = role === "admin" || role === "manager";
 
   const project = useQuery({
@@ -99,6 +101,11 @@ export function ProjectDetailPage() {
               New Task
             </Button>
           )}
+          {canCreate && project.data ? (
+            <Button variant="ghost" onClick={() => setMembersOpen(true)} title="Manage members">
+              <Users className="h-4 w-4" />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             onClick={() => qc.invalidateQueries({ queryKey: ["tasks", { projectId }] })}
@@ -195,6 +202,15 @@ export function ProjectDetailPage() {
           project={project.data}
           onClose={() => setCreateOpen(false)}
           onCreated={() => void qc.invalidateQueries({ queryKey: ["tasks", { projectId }] })}
+        />
+      )}
+
+      {project.data && (
+        <ManageMembersModal
+          open={membersOpen}
+          project={project.data}
+          onClose={() => setMembersOpen(false)}
+          onUpdated={() => void qc.invalidateQueries({ queryKey: ["project", projectId] })}
         />
       )}
     </div>

@@ -4,17 +4,44 @@ import { Link, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 import { priorityBadgeClass, statusColor } from "../../lib/taskUi";
-import type { ApiResponse, Task, TaskStatus } from "../../types";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea, Skeleton, Avatar } from "../../ui/components";
-import { ArrowLeft, MessageSquare, Clock, User, Calendar } from "lucide-react";
+import type { ApiResponse, Paginated, Task, TaskPriority, TaskStatus, User as UserType } from "../../types";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Modal,
+  Select,
+  Skeleton,
+  Textarea,
+} from "../../ui/components";
+import { ArrowLeft, MessageSquare, Clock, User, Calendar, Trash2, Pencil } from "lucide-react";
 import { cn } from "../../ui/cn";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "../../auth/AuthContext";
 
 export function TaskDetailPage() {
   const { id } = useParams();
   const taskId = id ?? "";
   const qc = useQueryClient();
   const [comment, setComment] = useState("");
+  const { role } = useAuth();
+  const canEdit = role === "admin" || role === "manager";
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editAssigneeId, setEditAssigneeId] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [editEstimatedHours, setEditEstimatedHours] = useState("");
+  const [editLoggedHours, setEditLoggedHours] = useState("");
 
   const task = useQuery({
     queryKey: ["task", taskId],
@@ -58,6 +85,69 @@ export function TaskDetailPage() {
 
   const t = task.data;
 
+  const employees = useQuery({
+    queryKey: ["users", "employees"],
+    enabled: editOpen && canEdit,
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Paginated<UserType>>>("/api/users?role=employee&page=1&limit=100");
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data.items;
+    },
+  });
+
+  const updateTask = useMutation({
+    mutationFn: async () => {
+      const tags = editTags
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const payload: Record<string, unknown> = {
+        title: editTitle.trim(),
+        description: editDescription,
+        priority: editPriority,
+        ...(editAssigneeId ? { assignedToId: editAssigneeId } : {}),
+        ...(editDueDate ? { dueDate: editDueDate } : {}),
+        ...(tags.length ? { tags } : { tags: [] }),
+      };
+      if (editEstimatedHours.trim() !== "") {
+        const n = Number(editEstimatedHours);
+        if (!Number.isNaN(n)) payload.estimatedHours = n;
+      }
+      if (editLoggedHours.trim() !== "") {
+        const n = Number(editLoggedHours);
+        if (!Number.isNaN(n)) payload.loggedHours = n;
+      }
+
+      const res = await api.patch<ApiResponse<Task>>(`/api/tasks/${taskId}`, payload);
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data;
+    },
+    onSuccess: async () => {
+      toast.success("Task updated");
+      setEditOpen(false);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["task", taskId] }),
+        qc.invalidateQueries({ queryKey: ["tasks"] }),
+      ]);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update task"),
+  });
+
+  const deleteTask = useMutation({
+    mutationFn: async () => {
+      const res = await api.delete<ApiResponse<boolean>>(`/api/tasks/${taskId}`);
+      if (!res.data.success) throw new Error(res.data.message);
+      return true;
+    },
+    onSuccess: async () => {
+      toast.success("Task deleted");
+      setDeleteOpen(false);
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      window.history.back();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to delete task"),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -81,7 +171,33 @@ export function TaskDetailPage() {
                     <h1 className="truncate text-2xl font-semibold text-fg">{t.title}</h1>
                     <p className="mt-2 text-sm text-fg-muted">{t.description || "No description provided."}</p>
                   </div>
-                  <Badge color={priorityBadgeClass(t.priority)}>{t.priority}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge color={priorityBadgeClass(t.priority)}>{t.priority}</Badge>
+                    {canEdit ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setEditTitle(t.title);
+                            setEditDescription(t.description ?? "");
+                            setEditPriority(t.priority);
+                            setEditDueDate(t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : "");
+                            setEditAssigneeId(t.assignedTo?._id ?? "");
+                            setEditTags((t.tags ?? []).join(", "));
+                            setEditEstimatedHours(typeof t.estimatedHours === "number" ? String(t.estimatedHours) : "");
+                            setEditLoggedHours(typeof t.loggedHours === "number" ? String(t.loggedHours) : "");
+                            setEditOpen(true);
+                          }}
+                          title="Edit task"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" onClick={() => setDeleteOpen(true)} title="Delete task">
+                          <Trash2 className="h-4 w-4 text-red-400" />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -105,6 +221,16 @@ export function TaskDetailPage() {
                     </span>
                   </div>
                 </div>
+
+                {(t.tags?.length ?? 0) > 0 ? (
+                  <div className="mb-6 flex flex-wrap gap-2">
+                    {(t.tags ?? []).map((tag) => (
+                      <span key={tag} className="rounded-full border border-border bg-white/5 px-2 py-0.5 text-xs text-fg-muted">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
 
                 {/* Status Update */}
                 <div className="mb-6">
@@ -206,6 +332,119 @@ export function TaskDetailPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={editOpen}
+        title="Edit task"
+        description="Update details for this task."
+        onClose={() => setEditOpen(false)}
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => updateTask.mutate()}
+              disabled={!editTitle.trim() || updateTask.isPending}
+            >
+              {updateTask.isPending ? "Saving…" : "Save"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs text-fg-muted">Title</label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-fg-muted">Priority</label>
+              <Select value={editPriority} onChange={(e) => setEditPriority(e.target.value as TaskPriority)}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-fg-muted">Description</label>
+            <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={4} />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs text-fg-muted">Due date</label>
+              <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-fg-muted">Assignee</label>
+              <Select
+                value={editAssigneeId}
+                onChange={(e) => setEditAssigneeId(e.target.value)}
+                disabled={employees.isLoading || employees.isError}
+              >
+                <option value="">
+                  {employees.isLoading ? "Loading…" : "Select assignee"}
+                </option>
+                {(employees.data ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-1">
+              <label className="text-xs text-fg-muted">Estimated hours</label>
+              <Input
+                inputMode="decimal"
+                value={editEstimatedHours}
+                onChange={(e) => setEditEstimatedHours(e.target.value)}
+                placeholder="e.g. 3"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <label className="text-xs text-fg-muted">Logged hours</label>
+              <Input
+                inputMode="decimal"
+                value={editLoggedHours}
+                onChange={(e) => setEditLoggedHours(e.target.value)}
+                placeholder="e.g. 1.5"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <label className="text-xs text-fg-muted">Tags</label>
+              <Input value={editTags} onChange={(e) => setEditTags(e.target.value)} placeholder="frontend, api" />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deleteOpen}
+        title="Delete task?"
+        description="This action cannot be undone."
+        onClose={() => setDeleteOpen(false)}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" type="button" onClick={() => deleteTask.mutate()} disabled={deleteTask.isPending}>
+              {deleteTask.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </>
+        }
+      >
+        <div className="text-sm text-fg-muted">Delete “{t?.title ?? "this task"}”?</div>
+      </Modal>
     </div>
   );
 }

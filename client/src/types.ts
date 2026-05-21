@@ -5,6 +5,9 @@ export type User = {
   name: string;
   email: string;
   role: Role;
+  avatar?: string;
+  department?: string;
+  isActive?: boolean;
 };
 
 export type ApiOk<T> = { success: true; data: T; message?: string };
@@ -17,9 +20,15 @@ export type Project = {
   _id: string;
   title: string;
   description?: string;
-  status: "active" | "archived";
-  createdBy: Pick<User, "id" | "name" | "email" | "role"> | { _id: string; name: string; email: string; role: Role };
-  members: Array<Pick<User, "id" | "name" | "email" | "role"> | { _id: string; name: string; email: string; role: Role }>;
+  color?: string;
+  icon?: string;
+  priority?: TaskPriority;
+  status: "planning" | "active" | "on_hold" | "completed" | "archived";
+  dueDate?: string;
+  completedAt?: string;
+  owner?: { _id: string; name: string; email: string; role: Role; avatar?: string; department?: string; isActive?: boolean };
+  createdBy: { _id: string; name: string; email: string; role: Role };
+  members: Array<{ _id: string; name: string; email: string; role: Role }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -42,10 +51,12 @@ export type Task = {
   createdBy: { _id: string; name: string; email: string; role: Role };
   status: TaskStatus;
   priority: TaskPriority;
+  tags?: string[];
+  estimatedHours?: number;
+  loggedHours?: number;
   dueDate?: string;
   completedAt?: string;
   comments?: TaskComment[];
   createdAt: string;
   updatedAt: string;
 };
-
