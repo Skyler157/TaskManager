@@ -27,6 +27,21 @@ export function DashboardPage() {
     },
   });
 
+  const trends = useQuery({
+    queryKey: ["tasks", "trends"],
+    queryFn: async () => {
+      const res = await api.get<
+        ApiResponse<{
+          windowDays: number;
+          created: { current: number; previous: number; pct: number };
+          completed: { current: number; previous: number; pct: number };
+        }>
+      >("/api/tasks/stats");
+      if (!res.data.success) throw new Error(res.data.message);
+      return res.data.data;
+    },
+  });
+
   const stats = {
     total: tasks.data?.length ?? 0,
     todo: tasks.data?.filter((t) => t.status === "todo").length ?? 0,
@@ -69,8 +84,12 @@ export function DashboardPage() {
           label="Total Tasks"
           value={stats.total}
           icon={<ListTodo className="h-5 w-5" />}
-          trend="+12% this week"
-          trendUp={true}
+          trend={
+            trends.data
+              ? `${trends.data.created.pct >= 0 ? "+" : ""}${trends.data.created.pct}% vs last ${trends.data.windowDays}d`
+              : undefined
+          }
+          trendUp={(trends.data?.created.pct ?? 0) >= 0}
         />
         <StatCard
           label="To Do"
@@ -90,8 +109,12 @@ export function DashboardPage() {
           label="Completed"
           value={stats.done}
           icon={<FolderKanban className="h-5 w-5" />}
-          trend="Great job!"
-          trendUp={true}
+          trend={
+            trends.data
+              ? `${trends.data.completed.pct >= 0 ? "+" : ""}${trends.data.completed.pct}% vs last ${trends.data.windowDays}d`
+              : undefined
+          }
+          trendUp={(trends.data?.completed.pct ?? 0) >= 0}
         />
       </div>
 

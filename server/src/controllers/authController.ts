@@ -23,10 +23,12 @@ const loginSchema = z.object({
 });
 
 function setRefreshCookie(res: Response, token: string) {
+  const isProd = process.env.NODE_ENV === "production";
   res.cookie("refreshToken", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Cross-site frontend (Netlify) -> API (Render) needs SameSite=None; Secure in production.
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     path: "/api/auth",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
@@ -145,4 +147,3 @@ export async function me(req: Request, res: Response) {
   if (!user) throw new AppError("User not found", 404);
   return res.json(ok(user));
 }
-

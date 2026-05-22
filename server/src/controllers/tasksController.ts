@@ -9,6 +9,57 @@ import { logAudit } from "../services/auditService";
 import { ok } from "../utils/apiResponse";
 import { AppError } from "../utils/errors";
 
+async function buildRoleFilter(req: Request) {
+  if (!req.auth) throw new AppError("Unauthorized", 401);
+
+  if (req.auth.role === "admin") return {};
+
+  if (req.auth.role === "employee") {
+    return { assignedTo: new mongoose.Types.ObjectId(req.auth.userId) };
+  }
+
+  // manager: tasks within projects where manager is creator/member
+  const uid = new mongoose.Types.ObjectId(req.auth.userId);
+  const projects = await ProjectModel.find({
+    $or: [{ createdBy: uid }, { members: uid }],
+  }).select("_id");
+  return { project: { $in: projects.map((p) => p._id) } };
+}
+
+function pctChange(current: number, previous: number) {
+  if (previous <= 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+export async function getTaskStats(req: Request, res: Response) {
+  if (!req.auth) throw new AppError("Unauthorized", 401);
+  const filter = await buildRoleFilter(req);
+
+  const now = new Date();
+  const startCurrent = new Date(now);
+  startCurrent.setDate(startCurrent.getDate() - 7);
+  const startPrev = new Date(now);
+  startPrev.setDate(startPrev.getDate() - 14);
+
+  const [createdCurrent, createdPrev, completedCurrent, completedPrev] = await Promise.all([
+    TaskModel.countDocuments({ ...filter, createdAt: { $gte: startCurrent, $lte: now } }),
+    TaskModel.countDocuments({ ...filter, createdAt: { $gte: startPrev, $lt: startCurrent } }),
+    TaskModel.countDocuments({ ...filter, completedAt: { $gte: startCurrent, $lte: now } }),
+    TaskModel.countDocuments({ ...filter, completedAt: { $gte: startPrev, $lt: startCurrent } }),
+  ]);
+
+  const createdPct = pctChange(createdCurrent, createdPrev);
+  const completedPct = pctChange(completedCurrent, completedPrev);
+
+  return res.json(
+    ok({
+      windowDays: 7,
+      created: { current: createdCurrent, previous: createdPrev, pct: createdPct },
+      completed: { current: completedCurrent, previous: completedPrev, pct: completedPct },
+    }),
+  );
+}
+
 const listTasksQuerySchema = z.object({
   status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
@@ -47,11 +98,8 @@ export async function listTasks(req: Request, res: Response) {
     filter.assignedTo = new mongoose.Types.ObjectId(req.auth.userId);
   } else {
     // manager: tasks within projects where manager is creator/member
-    const uid = new mongoose.Types.ObjectId(req.auth.userId);
-    const projects = await ProjectModel.find({
-      $or: [{ createdBy: uid }, { members: uid }],
-    }).select("_id");
-    filter.project = { $in: projects.map((p) => p._id) };
+    const roleFilter = await buildRoleFilter(req);
+    Object.assign(filter, roleFilter);
     if (q.assignee) filter.assignedTo = new mongoose.Types.ObjectId(q.assignee);
   }
 

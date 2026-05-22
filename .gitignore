@@ -25,3 +25,5 @@ Thumbs.db
 
 # misc
 *.log
+
+seed.ts

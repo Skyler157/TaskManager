@@ -16,6 +16,7 @@ import { usersRouter } from "./routes/usersRoutes";
 
 export function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
 
   app.use(
     helmet({
@@ -59,4 +60,3 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
-
